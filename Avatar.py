@@ -12,10 +12,10 @@ class Avatar(tk.Tk):
         self.attributes('-topmost', True)  # Окно всегда поверх других
 
         self.animations = {
-            'default': "default.gif",
-            'anger': "anger.gif",
-            'move_right_arm': "move_right_arm.gif",
-            'jump': "jump.gif",
+            'default': "avatar_emoji/default.gif",
+            'anger': "avatar_emoji/anger.gif",
+            'move_right_arm': "avatar_emoji/move_right_arm.gif",
+            'jump': "avatar_emoji/jump.gif",
         }
         self.frames = {}
         for key in self.animations:
@@ -36,10 +36,6 @@ class Avatar(tk.Tk):
         # Начальные координаты окна
         self.x_offset = 0
         self.y_offset = 0
-
-        # Запускаем поток для обработки терминального ввода
-        self.input_thread = threading.Thread(target=self.process_input, daemon=True)
-        self.input_thread.start()
 
     def load_gif_frames(self, file_path):
         """Загружает кадры из файла GIF."""
@@ -78,17 +74,3 @@ class Avatar(tk.Tk):
             self.current_frame = 0
         else:
             print(f"Анимация '{animation_name}' не найдена.")
-
-    def process_input(self):
-        """Обрабатывает терминальный ввод."""
-        while True:
-            animation_name = input("Введите имя анимации (или 'exit' для выхода): ")
-            if animation_name.lower() == 'exit':
-                self.destroy()
-                break
-            self.set_animation(animation_name)
-
-# Пример использования
-if __name__ == "__main__":
-    avatar = Avatar()
-    avatar.mainloop()

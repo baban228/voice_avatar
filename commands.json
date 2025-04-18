@@ -1,20 +1,44 @@
 {
-"intents": {
-    "greeting": {
-        "examples": ["привет", "здравствуй", "добрый день",
-                     "hello", "good morning"],
-        "responses": play_greetings
-    },
-    "farewell": {
-        "examples": ["пока", "до свидания", "увидимся", "до встречи",
-                     "goodbye", "bye", "see you soon"],
-        "responses": play_farewell_and_quit
-    },
-    "google_search": {
-        "examples": ["найди в гугл",
-                     "search on google", "google", "find on google"],
-        "responses": search_for_term_on_google
-    },
-},
-"failure_phrases": play_failure_phrase
+    "commands": [
+        {
+            "name": "привет",
+            "description": "Приветствие пользователя",
+            "action": "greet"
+        },
+        {
+            "name": "время",
+            "description": "Вывод текущего времени",
+            "action": "get_time"
+        },
+        {
+            "name": "погода",
+            "description": "Получение информации о погоде",
+            "action": "get_weather"
+        },
+        {
+            "name": "анекдот",
+            "description": "Рассказ смешной истории",
+            "action": "tell_joke"
+        },
+        {
+            "name": "напомни",
+            "description": "Установка напоминания",
+            "action": "set_reminder"
+        },
+        {
+            "name": "музыка",
+            "description": "Включение музыки",
+            "action": "play_music"
+        },
+        {
+            "name": "планы",
+            "description": "Проверка календаря на следующий день",
+            "action": "check_calendar"
+        },
+        {
+            "name": "день недели",
+            "description": "Уточнение текущего дня недели",
+            "action": "get_day_of_week"
+        }
+    ]
 }

@@ -1,204 +1,156 @@
-import tkinter as tk
-from PIL import Image, ImageTk
-import sys
+import pyttsx3  # синтез речи (Text-To-Speech)
+from vosk import Model, KaldiRecognizer
 import threading
 import queue
+import json
+import pyaudio
 import time
 
-class HumanFigure:
-    def __init__(self, root):
-        self.root = root
-        self._offset_x = 0
-        self._offset_y = 0
-        self.animation_paused = False
-        self.current_animation = None
+from commands import Commands
+from settings_assistant import VoiceAssistant
 
-        # Загрузка частей тела
-        self.body_parts = {
-            'body': Image.open("body.png"),
-            'left_arm': Image.open("left_arm.png"),
-            'right_arm': Image.open("right_arm.png"),
-            'left_leg': Image.open("left_leg.png"),
-            'right_leg': Image.open("right_leg.png")
-        }
+# Инициализация глобальных переменных
+assistant = VoiceAssistant()
+ttsEngine = pyttsx3.init()
 
-        # Преобразование в PhotoImage
-        self.body_part_photos = {key: ImageTk.PhotoImage(img) for key, img in self.body_parts.items()}
+def setup_assistant_voice():
+    """
+    Установка голоса по умолчанию (индекс может меняться в
+    зависимости от настроек операционной системы)
+    """
+    voices = ttsEngine.getProperty("voices")
 
-        # Настройка Canvas
-        body_width, body_height = self.body_parts['body'].size
-        canvas_width = body_width * 4
-        canvas_height = body_height * 4
-        self.canvas = tk.Canvas(root, width=canvas_width, height=canvas_height, bg='white', highlightthickness=0)
-        self.canvas.pack()
-
-        # Координаты частей тела
-        self.positions = {
-            'body': (canvas_width // 2, canvas_height // 2),
-            'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),  # Рука левее и немного выше
-            'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),  # Рука правее и немного выше
-            'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),  # Нога ниже
-            'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)  # Нога ниже
-        }
-
-        # Отображение частей тела
-        self.body_part_ids = {
-            key: self.canvas.create_image(x, y, image=self.body_part_photos[key], anchor=tk.CENTER)
-            for key, (x, y) in self.positions.items()
-        }
-
-        # Настройки окна
-        root.overrideredirect(True)
-        root.attributes('-topmost', True)
-        root.attributes('-transparentcolor', 'white')
-        root.geometry(f"{canvas_width}x{canvas_height}+100+100")
-
-        # Перетаскивание
-        self.canvas.bind("<Button-1>", self.on_mouse_down)
-        self.canvas.bind("<B1-Motion>", self.on_mouse_move)
-        self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
-
-        # Анимации
-        self.animations = {
-            'idle': [
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)}
-            ],
-            'raise_hand': [
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 135),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)},
-
-            ],
-            'nod': [
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)},
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)},
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)},
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80)}
-            ],
-            'move_right': [
-                {'left_arm': (canvas_width // 4 - 6 + 100, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7 + 100, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57 + 100, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62 + 100, 2 * canvas_height // 3 + 80)},
-                {'left_arm': (canvas_width // 4 - 6 + 200, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7 + 200, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57 + 200, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62 + 200, 2 * canvas_height // 3 + 80)}
-            ],
-            'move_left': [
-                {'left_arm': (canvas_width // 4 - 6 - 100, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7 - 100, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57 - 100, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62 - 100, 2 * canvas_height // 3 + 80)},
-                {'left_arm': (canvas_width // 4 - 6 - 200, canvas_height // 3 + 185),
-                 'right_arm': (3 * canvas_width // 4 + 7 - 200, canvas_height // 3 + 185),
-                 'left_leg': (canvas_width // 4 + 57 - 200, 2 * canvas_height // 3 + 83),
-                 'right_leg': (3 * canvas_width // 4 - 62 - 200, 2 * canvas_height // 3 + 80)}
-            ],
-            'move_up': [
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185 - 100),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185 - 100),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83 - 100),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80 - 100)},
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185 - 200),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185 - 200),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83 - 200),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80 - 200)}
-            ],
-            'move_down': [
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185 + 100),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185 + 100),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83 + 100),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80 + 100)},
-                {'left_arm': (canvas_width // 4 - 6, canvas_height // 3 + 185 + 200),
-                 'right_arm': (3 * canvas_width // 4 + 7, canvas_height // 3 + 185 + 200),
-                 'left_leg': (canvas_width // 4 + 57, 2 * canvas_height // 3 + 83 + 200),
-                 'right_leg': (3 * canvas_width // 4 - 62, 2 * canvas_height // 3 + 80 + 200)}
-            ]
-        }
-
-    def on_mouse_down(self, event):
-        self._offset_x = event.x
-        self._offset_y = event.y
-        # При нажатии на окно останавливаем текущую анимацию
-        if self.current_animation:
-            self.root.after_cancel(self.current_animation)
-            self.current_animation = None
-
-    def on_mouse_move(self, event):
-        x = self.root.winfo_pointerx() - self._offset_x
-        y = self.root.winfo_pointery() - self._offset_y
-        self.root.geometry(f"+{x}+{y}")
-
-    def on_mouse_up(self, event):
-        self._offset_x = 0
-        self._offset_y = 0
-
-    def play_animation(self, animation_name, frame=0):
-        if self.animation_paused:
-            return
-        if frame < len(self.animations[animation_name]):
-            for part, (x, y) in self.animations[animation_name][frame].items():
-                self.canvas.coords(self.body_part_ids[part], x, y)
-            self.current_animation = self.root.after(100, self.play_animation, animation_name, frame + 1)
+    if assistant.speech_language == "en":
+        assistant.recognition_language = "en-US"
+        if assistant.sex == "female":
+            # Microsoft Zira Desktop - English (United States)
+            ttsEngine.setProperty("voice", voices[1].id)
         else:
-            # После завершения анимации возвращаемся в idle
-            self.current_animation = None
-            self.update_image('idle')
+            # Microsoft David Desktop - English (United States)
+            ttsEngine.setProperty("voice", voices[2].id)
+    else:
+        assistant.recognition_language = "ru-RU"
+        # Microsoft Irina Desktop - Russian
+        ttsEngine.setProperty("voice", voices[0].id)
 
-    def update_image(self, image_name):
-        if self.current_animation:
-            self.root.after_cancel(self.current_animation)
-            self.current_animation = None
-        if image_name in self.animations:
-            if len(self.animations[image_name]) > 1:
-                # Запускаем анимацию
-                self.play_animation(image_name)
-            else:
-                # Показываем статичное изображение
-                for part, (x, y) in self.animations[image_name][0].items():
-                    self.canvas.coords(self.body_part_ids[part], x, y)
+def initialize_vosk_recognition():
+    """
+    Инициализация ресурсов для офлайн-распознавания речи
+    """
+    try:
+        # Загрузка модели Vosk
+        model = Model("models/vosk-model-small-ru-0.22")
+
+        # Инициализация PyAudio
+        p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8000)
+        stream.start_stream()
+
+        # Инициализация распознавателя Vosk
+        offline_recognizer = KaldiRecognizer(model, 16000)
+
+        return stream, offline_recognizer, p
+    except Exception as e:
+        print(f"Произошла ошибка при инициализации: {e}")
+        return None, None, None
+
+def listen_and_recognize(stream, offline_recognizer, command_queue, activation_lock, active_until):
+    """
+    Прослушивание и распознавание речи
+    :param stream: аудиопоток
+    :param offline_recognizer: распознаватель Vosk
+    :param command_queue: очередь для передачи команд
+    :param activation_lock: блокировка для синхронизации доступа к активации
+    :param active_until: время окончания активности
+    """
+    try:
+        print("Слушаю...")
+        while True:
+            data = stream.read(4000, exception_on_overflow=False)
+            if len(data) == 0:
+                break
+            if offline_recognizer.AcceptWaveform(data):
+                result = offline_recognizer.Result()
+                result = json.loads(result)
+                recognized_data = result["text"].strip().lower()
+                if recognized_data:
+                    print(f"Распознано: {recognized_data}")
+                    with activation_lock:
+                        if not active_until[0]:
+                            # Проверка наличия слова-ключа "виви"
+                            if recognized_data == "виви":
+                                active_until[0] = time.time() + 60  # Активность в течение 1 минуты
+                                commands.play_voice_assistant_speech("Слушаю...")
+                        else:
+                            # Проверка времени активности
+                            if time.time() < active_until[0]:
+                                # Отделение команды от дополнительной информации (аргументов)
+                                voice_input = recognized_data.split(" ")
+                                if len(voice_input) > 0:
+                                    command = voice_input[0]
+                                    arguments = " ".join(voice_input[1:]) if len(voice_input) > 1 else ""
+                                    # Помещаем команду и аргументы в очередь для обработки в основном потоке
+                                    command_queue.put((command, arguments))
+                            else:
+                                active_until[0] = None
+                                print("Активность завершена")
+    except Exception as e:
+        print(f"Произошла ошибка при распознавании: {e}")
+
+def process_queue(commands, command_queue):
+    while not command_queue.empty():
+        command, arguments = command_queue.get()
+        print(f"Выполняю команду: {command} с аргументами: {arguments}")
+        commands.execute_command(command, arguments)
+    commands.avatar.after(100, process_queue, commands, command_queue)  # Проверяем очередь каждые 100 мс
 
 def main():
-    q = queue.Queue()
+    # настройка данных голосового помощника
+    assistant.name = "Vivi"
+    assistant.sex = "female"
+    assistant.speech_language = "ru"
 
-    root = tk.Tk()
-    human = HumanFigure(root)
+    # инициализация инструмента синтеза речи
+    setup_assistant_voice()
 
-    def process_commands():
-        while True:
-            command = q.get()
-            if command in ['raise_hand', 'nod', 'idle', 'move_right', 'move_left', 'move_up', 'move_down']:
-                human.update_image(command)
-            q.task_done()
+    # Инициализация ресурсов для офлайн-распознавания речи
+    stream, offline_recognizer, p = initialize_vosk_recognition()
+    if stream is None or offline_recognizer is None or p is None:
+        print("Не удалось инициализировать ресурсы для распознавания речи")
+        return
 
-    def stdin_listener():
-        for line in sys.stdin:
-            command = line.strip()
-            if command:
-                q.put(command)
-        q.join()
+    # Создание объекта Commands
+    global commands
+    commands = Commands()
+    commands.load_commands('commands.json')
+    commands.set_ttsEngine(ttsEngine)
 
-    threading.Thread(target=process_commands, daemon=True).start()
-    threading.Thread(target=stdin_listener, daemon=True).start()
+    # Создание очереди для передачи команд
+    command_queue = queue.Queue()
 
-    root.mainloop()
+    # Блокировка для синхронизации доступа к активации и время окончания активности
+    activation_lock = threading.Lock()
+    active_until = [None]
+
+    # Создание и запуск потока для обработки голосовых команд
+    voice_thread = threading.Thread(
+        target=listen_and_recognize,
+        args=(stream, offline_recognizer, command_queue, activation_lock, active_until),
+        daemon=True
+    )
+    voice_thread.start()
+
+    # Запуск обработчика очереди
+    commands.avatar.after(100, process_queue, commands, command_queue)
+
+    # Запуск главного цикла Tkinter
+    try:
+        commands.avatar.mainloop()
+    finally:
+        # Завершение работы аудиопотока
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
 
 if __name__ == "__main__":
     main()
