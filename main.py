@@ -1,12 +1,11 @@
 import pyttsx3  # синтез речи (Text-To-Speech)
 from vosk import Model, KaldiRecognizer
-import threading
 import queue
-import json
 import pyaudio
 import time
 
-from commands import Commands
+
+from commands import *
 from settings_assistant import VoiceAssistant
 
 # Инициализация глобальных переменных
@@ -64,6 +63,8 @@ def listen_and_recognize(stream, offline_recognizer, command_queue, activation_l
     :param active_until: время окончания активности
     """
     try:
+        commands.play_voice_assistant_speech("Низкобюджетная версия алисы готова к работе...")
+        commands.play_voice_assistant_speech("чтобы узнать функционал скажите слово инструкция")
         print("Слушаю...")
         while True:
             data = stream.read(4000, exception_on_overflow=False)
@@ -77,6 +78,11 @@ def listen_and_recognize(stream, offline_recognizer, command_queue, activation_l
                     print(f"Распознано: {recognized_data}")
                     with activation_lock:
                         if not active_until[0]:
+                            if "инструкция" in recognized_data:
+                                file_path = 'instruction.html'
+                                # Открытие файла в браузере
+                                webbrowser.open(file_path)
+                                commands.play_voice_assistant_speech("готово")
                             # Проверка наличия слова-ключа "алиса"
                             if "алиса" in recognized_data:
                                 active_until[0] = time.time() + 60  # Активность в течение 1 минуты

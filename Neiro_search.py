@@ -33,9 +33,3 @@ class Neiro_search:
                 return 'Круто!'
         except:
             return 'Круто!'
-
-
-
-if __name__ == "__main__":
-    bot = Neiro_search()
-    bot.answer("привет")

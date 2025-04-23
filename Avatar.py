@@ -1,6 +1,6 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import threading
+
 
 class Avatar(tk.Tk):
     def __init__(self):
