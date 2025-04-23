@@ -1,0 +1,49 @@
+{
+    "commands": [
+        {
+            "name": "привет",
+            "description": "Приветствие пользователя",
+            "action": "greet"
+        },
+        {
+            "name": "время",
+            "description": "Вывод текущего времени",
+            "action": "get_time"
+        },
+        {
+            "name": "погода",
+            "description": "Получение информации о погоде",
+            "action": "get_weather"
+        },
+        {
+            "name": "анекдот",
+            "description": "Рассказ смешной истории",
+            "action": "tell_joke"
+        },
+        {
+            "name": "заметка",
+            "description": "Установка напоминания",
+            "action": "create_node"
+        },
+        {
+            "name": "список",
+            "description": "Установка напоминания",
+            "action": "display_notes_in_default_editor"
+        },
+        {
+            "name": "музыка",
+            "description": "Включение музыки",
+            "action": "play_music"
+        },
+        {
+            "name": "праздники",
+            "description": "Проверка календаря на следующий день",
+            "action": "check_calendar"
+        },
+        {
+            "name": "сегодня",
+            "description": "Уточнение текущего дня недели",
+            "action": "display_current_weekday"
+        }
+    ]
+}
