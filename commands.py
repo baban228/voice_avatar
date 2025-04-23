@@ -3,6 +3,9 @@ import threading
 import requests
 import configparser
 import random
+import webbrowser
+from datetime import datetime
+from transformers import pipeline
 
 from Avatar import Avatar
 
@@ -19,11 +22,23 @@ class Commands:
         self.commands = None
         self.ttsEngine = None
 
+        self.holidays = [
+            (1, 1, "Новый год"),
+            (7, 1, "Рождество Крещатика"),
+            (8, 3, "Международный женский день"),
+            (9, 5, "День Весны и Труда"),
+            (12, 6, "День России"),
+            (24, 12, "Рождество"),
+            # Добавьте другие праздники по необходимости
+        ]
+
         self.state = "default"
 
         self.avatar = Avatar()
         self.avatar_thread = threading.Thread(target=self.avatar.mainloop, daemon=True)
         self.avatar_thread.start()
+
+        self.generator = pipeline('text-generation', model='gpt2')
 
     def change_state(self, new_state):
         print(f"изменилось с {self.state} на {new_state}")
@@ -56,7 +71,8 @@ class Commands:
                 action = command['action']
                 if action == 'greet':
                     self.greet()
-                    self.change_state("anger")
+                elif action == "get_time":
+                    self.get_time()
                 elif action == 'get_weather':
                     self.get_weather()
                 elif action == 'change_state':
@@ -67,18 +83,21 @@ class Commands:
                         print("Не указано новое состояние для команды 'change_state'")
                 elif action == 'tell_joke':
                     self.tell_joke()
-                elif action == 'set_reminder':
-                    self.set_reminder(arguments)
+                elif action == 'create_node':
+                    self.create_node(arguments)
+                elif action == "display_notes_in_default_editor":
+                    self.display_notes_in_default_editor()
                 elif action == 'play_music':
                     self.play_music(arguments)
                 elif action == 'check_calendar':
-                    self.check_calendar(arguments)
-                elif action == 'get_day_of_week':
-                    self.get_day_of_week(arguments)
+                    self.check_calendar()
+                elif action == 'display_current_weekday':
+                    self.display_current_weekday()
                 else:
                     print("Неизвестное действие")
                 return
         print("Команда не найдена")
+        self.generate_response_with_gpt(f"Пользователь сказал: {command_name} {arguments}")
 
     def play_voice_assistant_speech(self, text_to_speech):
         """
@@ -91,8 +110,27 @@ class Commands:
         else:
             print(f"Текст: {text_to_speech}")
 
+    def generate_response_with_gpt(self, prompt):
+        try:
+            response = self.generator(prompt, max_length=150, num_return_sequences=1, temperature=0.7)
+            generated_text = response[0]['generated_text'].strip()
+            print("Ответ нейросети:", generated_text)
+            self.play_voice_assistant_speech(generated_text)
+        except Exception as e:
+            print(f"Произошла ошибка при генерации ответа: {e}")
+            self.play_voice_assistant_speech("Извините, я не смогу ответить на это.")
+
     def greet(self):
         self.play_voice_assistant_speech("Привет! Как я могу помочь?")
+        self.change_state("anger")
+
+    def get_time(self):
+        """
+        Возвращает текущее время в формате 'ЧЧ:ММ:СС'.
+        """
+        now = datetime.now()
+        self.play_voice_assistant_speech(now.strftime("%H:%M:%S"))
+        self.change_state("default")
 
     def get_weather(self, lang='ru'):
         base_url = "http://api.openweathermap.org/data/2.5/weather?"
@@ -127,19 +165,107 @@ class Commands:
                     self.play_voice_assistant_speech("Похоже сегодня без анекдотов")
                     self.change_state("move_right_arm")
                 self.play_voice_assistant_speech(random.choice(lines).strip())
+                self.change_state("move_right_arm")
         except FileNotFoundError:
             return "Файл не найден"
         except Exception as e:
             return f"Произошла ошибка: {e}"
 
-    def set_reminder(self, arguments):
-        self.play_voice_assistant_speech(f"Установлен напоминание: {arguments}")
+    def create_node(self, arguments):
+        """
+            Функция для создания заметки и сохранения ее в файл.
+
+            :param note: Текст заметки.
+            """
+        with open("notes.txt", "a", encoding="utf-8") as file:
+            file.write(arguments + "\n")
+        print(f"Заметка добавлена: {arguments}")
+        self.play_voice_assistant_speech(f"Заметка добавлена: {arguments}")
+        self.change_state("jump")
+
+    def display_notes_in_default_editor(self):
+        """
+        Функция для отображения всех заметок в стандартном текстовом редакторе.
+        """
+        try:
+            # Открываем файл в стандартном текстовом редакторе
+            webbrowser.open("notes.txt")
+        except Exception as e:
+            print(f"Не удалось открыть файл: {e}")
+
 
     def play_music(self, arguments):
         self.play_voice_assistant_speech(f"Воспроизведение музыки: {arguments}")
+        self.change_state("move_right_arm")
 
-    def check_calendar(self, arguments):
-        self.play_voice_assistant_speech(f"Проверка календаря: {arguments}")
+    def get_holiday(self, holidays):
+        """
+        Функция для получения ближайшего праздника из списка.
 
-    def get_day_of_week(self, arguments):
-        self.play_voice_assistant_speech(f"День недели: {arguments}")
+        :param holidays: Список праздников в формате (день, месяц, название праздника).
+        :return: Название ближайшего праздника и дата.
+        """
+        today = datetime.today()
+        current_year = today.year
+
+        nearest_holiday = None
+        nearest_date = None
+
+        for day, month, name in holidays:
+            holiday_date = datetime(current_year, month, day)
+
+            # Если праздник уже прошел в этом году, рассмотрим следующий год
+            if holiday_date < today:
+                holiday_date = datetime(current_year + 1, month, day)
+
+            if nearest_holiday is None or holiday_date < nearest_date:
+                nearest_holiday = name
+                nearest_date = holiday_date
+
+        days_until_holiday = (nearest_date - today).days
+        return nearest_holiday, nearest_date, days_until_holiday
+
+    def check_calendar(self):
+        """
+        Функция для отображения ближайшего праздника.
+        """
+        nearest_holiday, nearest_date, days_until_holiday = self.get_holiday(self.holidays)
+        formatted_date = nearest_date.strftime("%d.%m.%Y")
+        self.play_voice_assistant_speech(f"Ближайший праздник: {nearest_holiday} ({formatted_date})")
+        self.play_voice_assistant_speech(f"До праздника осталось: {days_until_holiday} дней")
+        self.change_state("default")
+
+
+    def get_day_of_week(self):
+        """
+        Функция для получения названия текущего дня недели на русском языке.
+
+        :return: Название текущего дня недели на русском языке.
+        """
+        # Словарь для перевода номера дня недели в название на русском языке
+        weekdays = {
+            0: "понедельник",
+            1: "вторник",
+            2: "среда",
+            3: "четверг",
+            4: "пятница",
+            5: "суббота",
+            6: "воскресенье"
+        }
+
+        # Получаем текущую дату
+        today = datetime.today()
+
+        # Получаем номер дня недели (0 - понедельник, 6 - воскресенье)
+        weekday_number = today.weekday()
+
+        # Возвращаем название дня недели на русском языке
+        return weekdays.get(weekday_number, "Неверная дата")
+
+    def display_current_weekday(self):
+        """
+        Функция для отображения названия текущего дня недели.
+        """
+        weekday_name = self.get_day_of_week()
+        self.play_voice_assistant_speech(f"Сегодня {weekday_name}")
+        self.change_state("agree")

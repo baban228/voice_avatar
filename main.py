@@ -77,8 +77,8 @@ def listen_and_recognize(stream, offline_recognizer, command_queue, activation_l
                     print(f"Распознано: {recognized_data}")
                     with activation_lock:
                         if not active_until[0]:
-                            # Проверка наличия слова-ключа "виви"
-                            if recognized_data == "виви":
+                            # Проверка наличия слова-ключа "алиса"
+                            if "алиса" in recognized_data:
                                 active_until[0] = time.time() + 60  # Активность в течение 1 минуты
                                 commands.play_voice_assistant_speech("Слушаю...")
                         else:
@@ -106,7 +106,7 @@ def process_queue(commands, command_queue):
 
 def main():
     # настройка данных голосового помощника
-    assistant.name = "Vivi"
+    assistant.name = "Alice"
     assistant.sex = "female"
     assistant.speech_language = "ru"
 

@@ -21,9 +21,14 @@
             "action": "tell_joke"
         },
         {
-            "name": "напомни",
+            "name": "заметка",
             "description": "Установка напоминания",
-            "action": "set_reminder"
+            "action": "create_node"
+        },
+        {
+            "name": "список",
+            "description": "Установка напоминания",
+            "action": "display_notes_in_default_editor"
         },
         {
             "name": "музыка",
@@ -31,14 +36,14 @@
             "action": "play_music"
         },
         {
-            "name": "планы",
+            "name": "праздники",
             "description": "Проверка календаря на следующий день",
             "action": "check_calendar"
         },
         {
-            "name": "день недели",
+            "name": "сегодня",
             "description": "Уточнение текущего дня недели",
-            "action": "get_day_of_week"
+            "action": "display_current_weekday"
         }
     ]
 }

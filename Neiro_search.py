@@ -1,4 +1,4 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import torch
 import logging
 import re
@@ -8,20 +8,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class RussianChatBot:
-    def __init__(self, model_name="deepseek-ai/deepseek-llm-7b-base"):
-        """Инициализация модели DeepSeek"""
+class Neiro_search:
+    def __init__(self, model_name="sberbank-ai/rugpt3medium_based_on_gpt2"):
+        """Инициализация русскоязычной модели"""
         try:
-            set_seed(42)
-
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             logger.info(f"Используемое устройство: {self.device}")
 
+            # Загружаем модель и токенизатор
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
-            ).to(self.device)
+            self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
 
             logger.info(f"Модель {model_name} успешно загружена")
 
@@ -32,19 +28,8 @@ class RussianChatBot:
             logger.error(f"Ошибка при загрузке модели: {e}")
             raise
 
-    def is_russian(self, text, threshold=0.5):
-        """Проверяет, является ли текст преимущественно русским"""
-        if not text.strip():
-            return False
-
-        russian_chars = len(self.russian_pattern.findall(text))
-        total_chars = max(len(re.findall(r'\w', text)), 1)
-        return (russian_chars / total_chars) >= threshold
-
-    def generate_response(self, user_input, max_length=150):
-        """
-        Генерирует ответ с помощью модели DeepSeek
-        """
+    def generate_response(self, user_input, max_length=100):
+        """Генерация ответа на русском языке"""
         try:
             prompt = f"Пользователь: {user_input}\nАссистент:"
 
@@ -68,27 +53,22 @@ class RussianChatBot:
             )
 
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            bot_response = response[len(prompt):].strip()
-
-            # Удаляем всё после первого законченного предложения
-            bot_response = re.split(r'(?<=[.!?])\s', bot_response)[0]
-
-            return bot_response
+            return response[len(prompt):].strip()
 
         except Exception as e:
             logger.error(f"Ошибка генерации: {e}")
-            return "Извините, произошла ошибка при генерации ответа."
+            return "Извините, произошла ошибка при обработке вашего запроса."
 
     def chat_loop(self):
         """Интерактивный режим чата"""
-        print("Привет! Я умный ассистент на основе DeepSeek. Задавайте вопросы.")
+        print("Привет! Я русскоязычный ассистент. Задавайте вопросы.")
         print("(Для выхода введите 'выход', 'exit' или 'quit')")
 
         while True:
             user_input = input("Вы: ")
 
             if user_input.lower() in ['выход', 'exit', 'quit']:
-                print("До свидания! Было приятно пообщаться.")
+                print("До свидания!")
                 break
 
             if not user_input.strip():
@@ -101,10 +81,12 @@ class RussianChatBot:
 
 if __name__ == "__main__":
     try:
-        # Можно выбрать разные версии модели:
-        # - "deepseek-ai/deepseek-llm-7b" (базовая)
-        # - "deepseek-ai/deepseek-llm-67b" (более мощная)
-        bot = RussianChatBot(model_name="deepseek-ai/deepseek-llm-7b-base")
+        # Доступные русскоязычные модели:
+        # - "sberbank-ai/rugpt3small_based_on_gpt2" (лёгкая)
+        # - "sberbank-ai/rugpt3medium_based_on_gpt2" (рекомендуемая)
+        # - "sberbank-ai/rugpt3large_based_on_gpt2" (требует больше ресурсов)
+
+        bot = Neiro_search(model_name="sberbank-ai/rugpt3small_based_on_gpt2")
         bot.chat_loop()
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}")
